@@ -1,10 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 project(rgain_jni)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(ANDROID_PLATFORM_LEVEL 29)
+
 add_library(rgain_jni SHARED rsgain_jni.cpp)
-target_include_directories(rgain_jni PRIVATE ../src ../submodules/ebur128)
-find_library(LOG_LIB log)
-target_link_libraries(rgain_jni ${LOG_LIB} avformat avcodec avutil swresample ebur128 tag z m)
-set_target_properties(rgain_jni PROPERTIES OUTPUT_NAME rgain_jni)
+
+target_compile_features(rgain_jni PRIVATE cxx_std_17)
+
+find_library(log-lib log)
+target_link_libraries(rgain_jni PRIVATE ${log-lib})
