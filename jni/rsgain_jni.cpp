@@ -1,6 +1,7 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <cstdint>
 #include "ebur128.h"
 
 extern "C" {
