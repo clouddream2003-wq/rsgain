@@ -1,8 +1,11 @@
 cmake_minimum_required(VERSION 3.22)
 project(rgain_jni)
 
-# Force static ebur128 so we ship only 1 .so
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -ffast-math -funroll-loops")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -DNDEBUG -ffast-math -funroll-loops")
+set(CMAKE_BUILD_TYPE Release)
 
 include(FetchContent)
 FetchContent_Declare(
@@ -15,8 +18,10 @@ FetchContent_MakeAvailable(ebur128)
 
 add_library(rgain_jni SHARED rsgain_jni.cpp)
 target_compile_features(rgain_jni PRIVATE cxx_std_17)
+target_compile_options(rgain_jni PRIVATE -O3 -ffast-math)
 
 target_include_directories(rgain_jni PRIVATE ${ebur128_SOURCE_DIR} ${ebur128_SOURCE_DIR}/ebur128)
 
 find_library(log-lib log)
-target_link_libraries(rgain_jni PRIVATE ebur128 ${log-lib})
+find_library(mediandk-lib mediandk)
+target_link_libraries(rgain_jni PRIVATE ebur128 ${log-lib} ${mediandk-lib})
