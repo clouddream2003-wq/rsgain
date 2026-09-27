@@ -1,31 +1,20 @@
 cmake_minimum_required(VERSION 3.22)
 project(rgain_jni)
 
-# Find ebur128 sources - works whether submodule is at root or subfolder
-file(GLOB EBUR128_SRC
-    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ebur128/*.c
-    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ebur128/ebur128/*.c
+include(FetchContent)
+FetchContent_Declare(
+  ebur128
+  GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
+  GIT_TAG v1.2.6
+  GIT_SHALLOW TRUE
 )
-
-if(NOT EBUR128_SRC)
-    message(FATAL_ERROR "ebur128 sources not found! Check submodules/ebur128")
-endif()
-
-add_library(ebur128 STATIC ${EBUR128_SRC})
-
-target_include_directories(ebur128 PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ebur128
-    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ebur128/ebur128
-)
+FetchContent_MakeAvailable(ebur128)
 
 add_library(rgain_jni SHARED rsgain_jni.cpp)
-
 target_compile_features(rgain_jni PRIVATE cxx_std_17)
 
-target_include_directories(rgain_jni PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ebur128
-    ${CMAKE_CURRENT_SOURCE_DIR}/../submodules/ebur128/ebur128
-)
+# ebur128 headers are in the source root
+target_include_directories(rgain_jni PRIVATE ${ebur128_SOURCE_DIR})
 
 find_library(log-lib log)
 target_link_libraries(rgain_jni PRIVATE ebur128 ${log-lib})
