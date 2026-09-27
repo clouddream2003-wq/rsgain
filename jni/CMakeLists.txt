@@ -13,7 +13,6 @@ FetchContent_MakeAvailable(ebur128)
 add_library(rgain_jni SHARED rsgain_jni.cpp)
 target_compile_features(rgain_jni PRIVATE cxx_std_17)
 
-# ebur128 headers are in the source root
 target_include_directories(rgain_jni PRIVATE ${ebur128_SOURCE_DIR} ${ebur128_SOURCE_DIR}/ebur128)
 
 find_library(log-lib log)
