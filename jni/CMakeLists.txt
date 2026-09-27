@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.22)
 project(rgain_jni)
 
+# Force static ebur128 so we ship only 1 .so
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
 include(FetchContent)
 FetchContent_Declare(
   ebur128
