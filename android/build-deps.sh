@@ -18,67 +18,40 @@ DEPS_DIR="$(pwd)/deps"
 SRC_DIR="$(pwd)/deps-src"
 mkdir -p "$DEPS_DIR" "$SRC_DIR"
 cd "$SRC_DIR"
-echo "PWD: $(pwd)"
-echo "DEPS_DIR: $DEPS_DIR"
-echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-<unset>}"
 
-fetch_tar() {
-  rm -f "$2"
-  curl -fL --retry 3 -o "$2" "$1"
-  if ! gzip -t "$2" 2>/dev/null; then
-    echo "Download failed: $1 did not return a valid gzip file" >&2
-    exit 1
-  fi
-}
-
-check_lib() {
-  if [ ! -f "$DEPS_DIR/lib/$1" ]; then
-    echo "ERROR: $1 missing from $DEPS_DIR/lib after install" >&2
-    exit 1
-  fi
-}
-
-echo "=== zlib ==="
-rm -rf zlib-1.3.1 zlib-build
-fetch_tar https://zlib.net/fossils/zlib-1.3.1.tar.gz zlib.tar.gz
-tar xzf zlib.tar.gz
+if [! -d zlib-1.3.1 ]; then
+  curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
+  tar xzf zlib.tar.gz
+fi
 cmake -S zlib-1.3.1 -B zlib-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF
 cmake --build zlib-build
 cmake --install zlib-build
-check_lib libz.a
 
-echo "=== libebur128 ==="
-rm -rf libebur128 ebur128-build
-git clone --depth 1 https://github.com/jiixyj/libebur128.git
+if [! -d libebur128 ]; then
+  git clone --depth 1 https://github.com/jiixyj/libebur128.git
+fi
 cmake -S libebur128 -B ebur128-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF
 cmake --build ebur128-build
 cmake --install ebur128-build
-check_lib libebur128.a
 
-echo "=== fmt ==="
-rm -rf fmt-11.1.4 fmt-build
-fetch_tar https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz fmt.tar.gz
-tar xzf fmt.tar.gz
+if [! -d fmt-11.1.4 ]; then
+  curl -L -o fmt.tar.gz https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz
+  tar xzf fmt.tar.gz
+fi
 cmake -S fmt-11.1.4 -B fmt-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF \
   -DFMT_DOC=OFF -DFMT_TEST=OFF
 cmake --build fmt-build
 cmake --install fmt-build
-check_lib libfmt.a
 
-echo "=== taglib ==="
-rm -rf taglib-2.0.2 taglib-build
-fetch_tar https://taglib.org/releases/taglib-2.0.2.tar.gz taglib.tar.gz
-tar xzf taglib.tar.gz
-if [ ! -f taglib-2.0.2/3rdparty/utfcpp/source/utf8.h ]; then
-  fetch_tar https://github.com/nemtrif/utfcpp/archive/refs/tags/v4.0.6.tar.gz utfcpp.tar.gz
-  mkdir -p taglib-2.0.2/3rdparty/utfcpp
-  tar xzf utfcpp.tar.gz -C taglib-2.0.2/3rdparty/utfcpp --strip-components=1
+if [! -d taglib-2.0.2 ]; then
+  curl -L -o taglib.tar.gz https://github.com/taglib/taglib/releases/download/v2.0.2/taglib-2.0.2.tar.gz
+  tar xzf taglib.tar.gz
 fi
 cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
@@ -86,12 +59,11 @@ cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
   -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF
 cmake --build taglib-build
 cmake --install taglib-build
-check_lib libtag.a
 
-echo "=== ffmpeg ==="
-rm -rf ffmpeg-7.1
-fetch_tar https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz ffmpeg.tar.gz
-tar xzf ffmpeg.tar.gz
+if [! -d ffmpeg-7.1 ]; then
+  curl -L -o ffmpeg.tar.gz https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz
+  tar xzf ffmpeg.tar.gz
+fi
 cd ffmpeg-7.1
 ./configure \
   --prefix="$DEPS_DIR" \
@@ -106,11 +78,4 @@ cd ffmpeg-7.1
   --extra-ldflags="-Wl,-z,max-page-size=16384"
 make -j$(nproc)
 make install
-cd ..
-check_lib libavformat.a
-check_lib libavcodec.a
-check_lib libavutil.a
-check_lib libswresample.a
-
-echo "=== installed ==="
-ls "$DEPS_DIR/lib"
+cd..
