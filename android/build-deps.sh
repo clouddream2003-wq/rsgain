@@ -69,7 +69,15 @@ cmake_build() {
   local srcdir="$1"
   local extra_args="${2:-}"
   echo "==> CMake building $srcdir"
-  cmake -S "$srcdir" -B "$srcdir/build" -G Ninja     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE"     -DANDROID_ABI="$ABI"     -DANDROID_PLATFORM="android-$API"     -DCMAKE_ANDROID_STL_TYPE=c++_static     -DCMAKE_INSTALL_PREFIX="$PREFIX"     -DCMAKE_BUILD_TYPE=Release     $extra_args
+  # shellcheck disable=SC2086
+  cmake -S "$srcdir" -B "$srcdir/build" -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+    -DANDROID_ABI="$ABI" \
+    -DANDROID_PLATFORM="android-$API" \
+    -DCMAKE_ANDROID_STL_TYPE=c++_static \
+    -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+    -DCMAKE_BUILD_TYPE=Release \
+    $extra_args
   cmake --build "$srcdir/build" -j"$JOBS"
   cmake --install "$srcdir/build"
 }
@@ -93,7 +101,42 @@ fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
 FFSRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
 echo "==> Configuring FFmpeg $FFMPEG_VERSION"
 cd "$FFSRC"
-./configure   --target-os=android   --arch=aarch64   --cpu=armv8-a   --enable-cross-compile   --cross-prefix="$LLVM_BIN/$TRIPLE-"   --sysroot="$SYSROOT"   --cc="$CC"   --cxx="$CXX"   --ar="$AR"   --ranlib="$RANLIB"   --strip="$STRIP"   --prefix="$PREFIX"   --pkg-config-flags="--static"   --extra-cflags="-fPIC -O2 -I$PREFIX/include"   --extra-ldflags="-L$PREFIX/lib"   --disable-everything   --disable-doc   --disable-avdevice   --disable-swscale   --disable-postproc   --disable-avfilter   --disable-network   --disable-programs   --disable-shared --enable-static --disable-symver   --enable-small   --enable-avformat   --enable-avcodec   --enable-avutil   --enable-swresample   --enable-decoder=aac,alac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,wavpack,ape,mpc7,mpc8,tak,tta,dsd_lsbf,dsd_msbf,wmav1,wmav2   --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak   --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis   --enable-protocol=file
+./configure \
+  --target-os=android \
+  --arch=aarch64 \
+  --cpu=armv8-a \
+  --enable-cross-compile \
+  --cross-prefix="$LLVM_BIN/$TRIPLE-" \
+  --sysroot="$SYSROOT" \
+  --cc="$CC" \
+  --cxx="$CXX" \
+  --ar="$AR" \
+  --ranlib="$RANLIB" \
+  --strip="$STRIP" \
+  --prefix="$PREFIX" \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-fPIC -O2 -I$PREFIX/include" \
+  --extra-ldflags="-L$PREFIX/lib" \
+  --disable-everything \
+  --disable-doc \
+  --disable-avdevice \
+  --disable-swscale \
+  --disable-postproc \
+  --disable-avfilter \
+  --disable-network \
+  --disable-programs \
+  --disable-shared \
+  --enable-static \
+  --disable-symver \
+  --enable-small \
+  --enable-avformat \
+  --enable-avcodec \
+  --enable-avutil \
+  --enable-swresample \
+  --enable-decoder=aac,alac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,wavpack,ape,mpc7,mpc8,tak,tta,dsd_lsbf,dsd_msbf,wmav1,wmav2 \
+  --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak \
+  --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis \
+  --enable-protocol=file
 make -j"$JOBS"
 make install
 cd -
@@ -107,6 +150,6 @@ for _a in avformat avcodec avutil swresample; do
 done
 
 echo "==> All dependencies installed to $PREFIX"
-ls -lh "$PREFIX/lib" | head -n 50
-find "$PREFIX" -name "libavformat*" -o -name "libtag*" | head -n 20
+ls -lh "$PREFIX/lib" | head -n 50 || true
+find "$PREFIX" -name "libavformat*" -o -name "libtag*" | head -n 20 || true
 echo "Done."
