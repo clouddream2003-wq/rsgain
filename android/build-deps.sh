@@ -19,8 +19,17 @@ SRC_DIR="$(pwd)/deps-src"
 mkdir -p "$DEPS_DIR" "$SRC_DIR"
 cd "$SRC_DIR"
 
+fetch_tar() {
+  rm -f "$2"
+  curl -fL --retry 3 -o "$2" "$1"
+  if ! gzip -t "$2" 2>/dev/null; then
+    echo "Download failed: $1 did not return a valid gzip file" >&2
+    exit 1
+  fi
+}
+
 if [ ! -d zlib-1.3.1 ]; then
-  curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
+  fetch_tar https://zlib.net/fossils/zlib-1.3.1.tar.gz zlib.tar.gz
   tar xzf zlib.tar.gz
 fi
 cmake -S zlib-1.3.1 -B zlib-build -G Ninja \
@@ -39,7 +48,7 @@ cmake --build ebur128-build
 cmake --install ebur128-build
 
 if [ ! -d fmt-11.1.4 ]; then
-  curl -L -o fmt.tar.gz https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz
+  fetch_tar https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz fmt.tar.gz
   tar xzf fmt.tar.gz
 fi
 cmake -S fmt-11.1.4 -B fmt-build -G Ninja \
@@ -50,7 +59,7 @@ cmake --build fmt-build
 cmake --install fmt-build
 
 if [ ! -d taglib-2.0.2 ]; then
-  curl -L -o taglib.tar.gz https://github.com/taglib/taglib/releases/download/v2.0.2/taglib-2.0.2.tar.gz
+  fetch_tar https://github.com/taglib/taglib/releases/download/v2.0.2/taglib-2.0.2.tar.gz taglib.tar.gz
   tar xzf taglib.tar.gz
 fi
 cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
@@ -61,7 +70,7 @@ cmake --build taglib-build
 cmake --install taglib-build
 
 if [ ! -d ffmpeg-7.1 ]; then
-  curl -L -o ffmpeg.tar.gz https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz
+  fetch_tar https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz ffmpeg.tar.gz
   tar xzf ffmpeg.tar.gz
 fi
 cd ffmpeg-7.1
@@ -78,4 +87,4 @@ cd ffmpeg-7.1
   --extra-ldflags="-Wl,-z,max-page-size=16384"
 make -j$(nproc)
 make install
-cd..
+cd ..
