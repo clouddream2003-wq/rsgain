@@ -28,44 +28,54 @@ fetch_tar() {
   fi
 }
 
-if [ ! -d zlib-1.3.1 ]; then
-  fetch_tar https://zlib.net/fossils/zlib-1.3.1.tar.gz zlib.tar.gz
-  tar xzf zlib.tar.gz
-fi
+check_lib() {
+  if [ ! -f "$DEPS_DIR/lib/$1" ]; then
+    echo "ERROR: $1 missing from $DEPS_DIR/lib after install" >&2
+    exit 1
+  fi
+}
+
+echo "=== zlib ==="
+rm -rf zlib-1.3.1 zlib-build
+fetch_tar https://zlib.net/fossils/zlib-1.3.1.tar.gz zlib.tar.gz
+tar xzf zlib.tar.gz
 cmake -S zlib-1.3.1 -B zlib-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF
 cmake --build zlib-build
 cmake --install zlib-build
+check_lib libz.a
 
-if [ ! -d libebur128 ]; then
-  git clone --depth 1 https://github.com/jiixyj/libebur128.git
-fi
+echo "=== libebur128 ==="
+rm -rf libebur128 ebur128-build
+git clone --depth 1 https://github.com/jiixyj/libebur128.git
 cmake -S libebur128 -B ebur128-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF
 cmake --build ebur128-build
 cmake --install ebur128-build
+check_lib libebur128.a
 
-if [ ! -d fmt-11.1.4 ]; then
-  fetch_tar https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz fmt.tar.gz
-  tar xzf fmt.tar.gz
-fi
+echo "=== fmt ==="
+rm -rf fmt-11.1.4 fmt-build
+fetch_tar https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz fmt.tar.gz
+tar xzf fmt.tar.gz
 cmake -S fmt-11.1.4 -B fmt-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
   -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF \
   -DFMT_DOC=OFF -DFMT_TEST=OFF
 cmake --build fmt-build
 cmake --install fmt-build
+check_lib libfmt.a
 
-if [ ! -d taglib-2.0.2 ]; then
-  fetch_tar https://taglib.org/releases/taglib-2.0.2.tar.gz taglib.tar.gz
-  tar xzf taglib.tar.gz
-  if [ ! -f taglib-2.0.2/3rdparty/utfcpp/source/utf8.h ]; then
-    fetch_tar https://github.com/nemtrif/utfcpp/archive/refs/tags/v4.0.6.tar.gz utfcpp.tar.gz
-    mkdir -p taglib-2.0.2/3rdparty/utfcpp
-    tar xzf utfcpp.tar.gz -C taglib-2.0.2/3rdparty/utfcpp --strip-components=1
-  fi
+echo "=== taglib ==="
+rm -rf taglib-2.0.2 taglib-build
+fetch_tar https://taglib.org/releases/taglib-2.0.2.tar.gz taglib.tar.gz
+tar xzf taglib.tar.gz
+if [ ! -f taglib-2.0.2/3rdparty/utfcpp/source/utf8.h ]; then
+  fetch_tar https://github.com/nemtrif/utfcpp/archive/refs/tags/v4.0.6.tar.gz utfcpp.tar.gz
+  mkdir -p taglib-2.0.2/3rdparty/utfcpp
+  tar xzf utfcpp.tar.gz -C taglib-2.0.2/3rdparty/utfcpp --strip-components=1
 fi
 cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
@@ -73,11 +83,12 @@ cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
   -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF
 cmake --build taglib-build
 cmake --install taglib-build
+check_lib libtag.a
 
-if [ ! -d ffmpeg-7.1 ]; then
-  fetch_tar https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz ffmpeg.tar.gz
-  tar xzf ffmpeg.tar.gz
-fi
+echo "=== ffmpeg ==="
+rm -rf ffmpeg-7.1
+fetch_tar https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz ffmpeg.tar.gz
+tar xzf ffmpeg.tar.gz
 cd ffmpeg-7.1
 ./configure \
   --prefix="$DEPS_DIR" \
@@ -93,3 +104,10 @@ cd ffmpeg-7.1
 make -j$(nproc)
 make install
 cd ..
+check_lib libavformat.a
+check_lib libavcodec.a
+check_lib libavutil.a
+check_lib libswresample.a
+
+echo "=== installed ==="
+ls "$DEPS_DIR/lib"
