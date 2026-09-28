@@ -59,8 +59,13 @@ cmake --build fmt-build
 cmake --install fmt-build
 
 if [ ! -d taglib-2.0.2 ]; then
-  fetch_tar https://github.com/taglib/taglib/releases/download/v2.0.2/taglib-2.0.2.tar.gz taglib.tar.gz
+  fetch_tar https://taglib.org/releases/taglib-2.0.2.tar.gz taglib.tar.gz
   tar xzf taglib.tar.gz
+  if [ ! -f taglib-2.0.2/3rdparty/utfcpp/source/utf8.h ]; then
+    fetch_tar https://github.com/nemtrif/utfcpp/archive/refs/tags/v4.0.6.tar.gz utfcpp.tar.gz
+    mkdir -p taglib-2.0.2/3rdparty/utfcpp
+    tar xzf utfcpp.tar.gz -C taglib-2.0.2/3rdparty/utfcpp --strip-components=1
+  fi
 fi
 cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
