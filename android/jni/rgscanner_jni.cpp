@@ -10,8 +10,8 @@
 #include <android/log.h>
 #include <libavutil/log.h>
 
-#include "rsgain.hpp"
 #include "scan.hpp"
+#include "rsgain.hpp"
 #include "tag.hpp"
 #include "output.hpp"
 
@@ -189,7 +189,7 @@ static bool readRgTags(const std::string& path, std::string& gain, std::string& 
     if (auto* mp4 = dynamic_cast<TagLib::MP4::File*>(f.file())) {
         TagLib::MP4::Tag* t = mp4->tag();
         if (!t) return false;
-        const auto& m = t->itemListMap();
+        const auto& m = t->itemMap();
         auto it = m.find("----:com.apple.iTunes:REPLAYGAIN_TRACK_GAIN");
         if (it == m.end()) return false;
         gain = it->second.toStringList().front().to8Bit(true);
@@ -205,19 +205,19 @@ static bool readRgTags(const std::string& path, std::string& gain, std::string& 
         const auto& m = ape->itemListMap();
         auto it = m.find("REPLAYGAIN_TRACK_GAIN");
         if (it == m.end()) return false;
-        gain = it->second.toStringList().front().to8Bit(true);
+        gain = it->second.values().front().to8Bit(true);
         auto itp = m.find("REPLAYGAIN_TRACK_PEAK");
-        if (itp != m.end() && !itp->second.toStringList().isEmpty()) peak = itp->second.toStringList().front().to8Bit(true);
+        if (itp != m.end() && !itp->second.values().isEmpty()) peak = itp->second.values().front().to8Bit(true);
         return true;
     }
     if (auto* asf = dynamic_cast<TagLib::ASF::File*>(f.file())) {
         TagLib::ASF::Tag* t = asf->tag();
         if (!t) return false;
-        TagLib::StringList sl = t->attribute("REPLAYGAIN_TRACK_GAIN").toStringList();
-        if (sl.isEmpty()) return false;
-        gain = sl.front().to8Bit(true);
-        TagLib::StringList pl = t->attribute("REPLAYGAIN_TRACK_PEAK").toStringList();
-        if (!pl.isEmpty()) peak = pl.front().to8Bit(true);
+        const auto attrs = t->attribute("REPLAYGAIN_TRACK_GAIN");
+        if (attrs.isEmpty()) return false;
+        gain = attrs.front().toString().to8Bit(true);
+        const auto pattrs = t->attribute("REPLAYGAIN_TRACK_PEAK");
+        if (!pattrs.isEmpty()) peak = pattrs.front().toString().to8Bit(true);
         return true;
     }
     return false;
