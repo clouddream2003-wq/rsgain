@@ -266,6 +266,19 @@ static jdoubleArray scan_with_ffmpeg(JNIEnv* env, int fd, int64_t offset, int64_
 
 // NDK fallback (same as before, optimized)
 static jdoubleArray scan_with_ndk(JNIEnv* env, int fd, int64_t offset, int64_t length) {
+    // Termux-like: auto-detect size via lseek if length is 0 or huge (from Java Long.MAX_VALUE)
+    if (length <= 0 || length == 0x7fffffffffffffffLL) {
+        off_t cur = lseek(fd, 0, SEEK_CUR);
+        off_t end = lseek(fd, 0, SEEK_END);
+        if (end > 0) length = end - offset;
+        else length = 0; // let extractor try with 0 = unknown
+        lseek(fd, cur, SEEK_SET);
+        if (length < 0) length = 0;
+    }
+    // dup fd for extractor safety (Java closes pfd after return)
+    int dupfd = dup(fd);
+    bool did_dup = (dupfd >= 0);
+    if (did_dup) fd = dupfd;
     if (fd < 0) return nullptr;
     AMediaExtractor* ex = AMediaExtractor_new();
     if (!ex) return nullptr;
@@ -348,6 +361,7 @@ static jdoubleArray scan_with_ndk(JNIEnv* env, int fd, int64_t offset, int64_t l
     ebur128_loudness_global(ebur, &lufs);
     ebur128_destroy(&ebur);
     AMediaCodec_stop(codec); AMediaCodec_delete(codec); AMediaExtractor_delete(ex);
+    if (did_dup) close(fd);
     jdoubleArray ret = env->NewDoubleArray(2);
     if (!ret) return nullptr;
     jdouble vals[2] = { lufs, (double)peakAbs / 32768.0 };
