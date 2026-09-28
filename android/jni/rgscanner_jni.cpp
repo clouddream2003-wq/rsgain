@@ -10,8 +10,8 @@
 #include <android/log.h>
 #include <libavutil/log.h>
 
-#include "scan.hpp"
 #include "rsgain.hpp"
+#include "scan.hpp"
 #include "tag.hpp"
 #include "output.hpp"
 
@@ -58,7 +58,7 @@ thread_local std::string tls_label;
 
 static JNIEnv* envForThread() {
     JNIEnv* env = nullptr;
-    if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6)!= JNI_OK) {
+    if (g_vm->GetEnv(reinterpret_cast<void**>(&env), JNI_VERSION_1_6) != JNI_OK) {
         g_vm->AttachCurrentThread(&env, nullptr);
     }
     return env;
@@ -112,11 +112,11 @@ static void postCompleteStatic(int ok, int fail, int skip) {
 }
 
 void ProgressBar::update(int pos) {
-    if (pos == pos_prev ||!len) return;
+    if (pos == pos_prev || !len) return;
     pos_prev = pos;
     int percent = (int)(((float)pos / (float)len) * 100.f);
     if (percent > 100) percent = 100;
-    if (percent!= c_prev) {
+    if (percent != c_prev) {
         c_prev = percent;
         postFileProgressStatic(tls_label, percent);
     }
@@ -160,7 +160,7 @@ static bool readRgTags(const std::string& path, std::string& gain, std::string& 
         if (it == m.end()) return false;
         gain = it->second.toString().to8Bit(true);
         auto itp = m.find("REPLAYGAIN_TRACK_PEAK");
-        if (itp!= m.end()) peak = itp->second.toString().to8Bit(true);
+        if (itp != m.end()) peak = itp->second.toString().to8Bit(true);
         return true;
     }
     TagLib::ID3v2::Tag* id3 = nullptr;
@@ -175,7 +175,7 @@ static bool readRgTags(const std::string& path, std::string& gain, std::string& 
         for (auto* fr : it->second) {
             auto* tx = dynamic_cast<TagLib::ID3v2::UserTextIdentificationFrame*>(fr);
             if (!tx || tx->fieldList().size() < 2) continue;
-            if (tx->description().upper()!= "REPLAYGAIN_TRACK_GAIN") continue;
+            if (tx->description().upper() != "REPLAYGAIN_TRACK_GAIN") continue;
             gain = tx->fieldList()[1].to8Bit(true);
             for (auto* fr2 : it->second) {
                 auto* tx2 = dynamic_cast<TagLib::ID3v2::UserTextIdentificationFrame*>(fr2);
@@ -194,7 +194,7 @@ static bool readRgTags(const std::string& path, std::string& gain, std::string& 
         if (it == m.end()) return false;
         gain = it->second.toStringList().front().to8Bit(true);
         auto itp = m.find("----:com.apple.iTunes:REPLAYGAIN_TRACK_PEAK");
-        if (itp!= m.end() &&!itp->second.toStringList().isEmpty()) peak = itp->second.toStringList().front().to8Bit(true);
+        if (itp != m.end() && !itp->second.toStringList().isEmpty()) peak = itp->second.toStringList().front().to8Bit(true);
         return true;
     }
     TagLib::APE::Tag* ape = nullptr;
@@ -207,7 +207,7 @@ static bool readRgTags(const std::string& path, std::string& gain, std::string& 
         if (it == m.end()) return false;
         gain = it->second.toStringList().front().to8Bit(true);
         auto itp = m.find("REPLAYGAIN_TRACK_PEAK");
-        if (itp!= m.end() &&!itp->second.toStringList().isEmpty()) peak = itp->second.toStringList().front().to8Bit(true);
+        if (itp != m.end() && !itp->second.toStringList().isEmpty()) peak = itp->second.toStringList().front().to8Bit(true);
         return true;
     }
     if (auto* asf = dynamic_cast<TagLib::ASF::File*>(f.file())) {
@@ -251,7 +251,7 @@ JNIEXPORT jint JNICALL Java_com_himig_offline_RgNative_nativeScan(
     for (jsize i = 0; i < n; i++) {
         jstring js = (jstring)env->GetObjectArrayElement(jfiles, i);
         const char* c = env->GetStringUTFChars(js, nullptr);
-        paths.emplace_back(c? c : "");
+        paths.emplace_back(c ? c : "");
         if (c) env->ReleaseStringUTFChars(js, c);
         env->DeleteLocalRef(js);
         albumIds.push_back(albumArr[i]);
@@ -259,7 +259,7 @@ JNIEXPORT jint JNICALL Java_com_himig_offline_RgNative_nativeScan(
     env->ReleaseIntArrayElements(jalbums, albumArr, JNI_ABORT);
 
     Config config;
-    config.tag_mode = (jtagMode == 1)? 'i' : 's';
+    config.tag_mode = (jtagMode == 1) ? 'i' : 's';
     config.skip_existing = false;
     config.target_loudness = (double)jtargetLoudness;
     config.max_peak_level = 0.0;
@@ -306,7 +306,7 @@ JNIEXPORT jint JNICALL Java_com_himig_offline_RgNative_nativeScan(
                 }
             }
             if (jdoAlbum) {
-                if (albums.empty() || albums.back().id!= albumIds[i]) albums.push_back({albumIds[i], {}});
+                if (albums.empty() || albums.back().id != albumIds[i]) albums.push_back({albumIds[i], {}});
                 albums.back().files.push_back(p);
             } else {
                 albums.push_back({albumIds[i], {p}});
@@ -329,7 +329,7 @@ JNIEXPORT jint JNICALL Java_com_himig_offline_RgNative_nativeScan(
                 if (a >= albums.size()) break;
                 Album& al = albums[a];
                 postAlbumStartStatic((int)a, (int)albums.size(), (int)al.files.size());
-                tls_label = al.files.size() == 1? al.files[0] : "album " + std::to_string(a + 1);
+                tls_label = al.files.size() == 1 ? al.files[0] : "album " + std::to_string(a + 1);
                 std::vector<std::string> hold = al.files;
                 std::vector<char*> argv;
                 argv.reserve(hold.size());
@@ -370,4 +370,4 @@ JNIEXPORT jint JNICALL Java_com_himig_offline_RgNative_nativeScan(
     return 0;
 }
 
-}
+} // extern "C"
