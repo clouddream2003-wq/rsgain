@@ -34,6 +34,8 @@ export CXX="$LLVM_BIN/${TRIPLE}${API}-clang++"
 export AR="$LLVM_BIN/llvm-ar"
 export RANLIB="$LLVM_BIN/llvm-ranlib"
 export STRIP="$LLVM_BIN/llvm-strip"
+export CFLAGS="-fPIC -O2"
+export CXXFLAGS="-fPIC -O2"
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
 echo "PREFIX=$PREFIX"
@@ -77,6 +79,9 @@ cmake_build() {
     -DCMAKE_ANDROID_STL_TYPE=c++_static \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+    -DCMAKE_C_FLAGS="-fPIC" \
+    -DCMAKE_CXX_FLAGS="-fPIC" \
     $extra_args
   cmake --build "$srcdir/build" -j"$JOBS"
   cmake --install "$srcdir/build"
@@ -156,6 +161,7 @@ cd "$FFSRC"
   --disable-programs \
   --disable-shared \
   --enable-static \
+  --enable-pic \
   --disable-symver \
   --enable-small \
   --enable-avformat \
