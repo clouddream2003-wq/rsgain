@@ -1,0 +1,5 @@
+#define PROJECT_NAME "rsgain"
+#define PROJECT_VERSION "3.7"
+#define EXECUTABLE_TITLE "rsgain"
+#define PROJECT_URL "https://github.com/complexlogic/rsgain"
+#define BUILD_DATE "@BUILD_DATE@"
