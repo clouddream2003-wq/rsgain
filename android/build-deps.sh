@@ -133,7 +133,7 @@ fi
 
 fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
 FFSRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
-echo "==> Configuring FFmpeg $FFMPEG_VERSION"
+echo "==> Configuring FFmpeg $FFMPEG_VERSION (PIC fix for aarch64 asm)"
 cd "$FFSRC"
 ./configure \
   --target-os=android \
@@ -149,7 +149,8 @@ cd "$FFSRC"
   --strip="$STRIP" \
   --prefix="$PREFIX" \
   --pkg-config-flags="--static" \
-  --extra-cflags="-fPIC -O2 -I$PREFIX/include" \
+  --extra-cflags="-fPIC -DPIC -O2 -I$PREFIX/include" \
+  --extra-asflags="-fPIC -DPIC -O2 -I$PREFIX/include" \
   --extra-ldflags="-L$PREFIX/lib" \
   --disable-everything \
   --disable-doc \
