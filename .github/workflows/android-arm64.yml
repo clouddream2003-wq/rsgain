@@ -17,6 +17,16 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ninja-build make curl git unzip
       - name: Build dependencies
         run: bash android/build-deps.sh
+      - name: Verify dependencies
+        run: |
+          ls -la "$GITHUB_WORKSPACE/deps/lib"
+          for lib in libz.a libebur128.a libfmt.a libtag.a libavformat.a libavcodec.a libavutil.a libswresample.a; do
+            if [ ! -f "$GITHUB_WORKSPACE/deps/lib/$lib" ]; then
+              echo "MISSING: $lib"
+              exit 1
+            fi
+          done
+          echo "All dependency libraries present"
       - name: Configure scanner lib
         run: >
           cmake -S android -B android/build -G Ninja
