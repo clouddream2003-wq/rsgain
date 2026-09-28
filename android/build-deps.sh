@@ -93,7 +93,7 @@ fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
 FFSRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
 echo "==> Configuring FFmpeg $FFMPEG_VERSION"
 cd "$FFSRC"
-./configure   --target-os=android   --arch=aarch64   --cpu=armv8-a   --enable-cross-compile   --cross-prefix="$LLVM_BIN/$TRIPLE-"   --sysroot="$SYSROOT"   --cc="$CC"   --cxx="$CXX"   --ar="$AR"   --ranlib="$RANLIB"   --strip="$STRIP"   --prefix="$PREFIX"   --pkg-config-flags="--static"   --extra-cflags="-fPIC -O2 -I$PREFIX/include"   --extra-ldflags="-L$PREFIX/lib"   --disable-everything   --disable-doc   --disable-avdevice   --disable-swscale   --disable-postproc   --disable-avfilter   --disable-network   --disable-programs   --disable-symver   --enable-small   --enable-avformat   --enable-avcodec   --enable-avutil   --enable-swresample   --enable-decoder=aac,alac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,wavpack,ape,mpc7,mpc8,tak,tta,dsd_lsbf,dsd_msbf,wmav1,wmav2   --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak   --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis   --enable-protocol=file
+./configure   --target-os=android   --arch=aarch64   --cpu=armv8-a   --enable-cross-compile   --cross-prefix="$LLVM_BIN/$TRIPLE-"   --sysroot="$SYSROOT"   --cc="$CC"   --cxx="$CXX"   --ar="$AR"   --ranlib="$RANLIB"   --strip="$STRIP"   --prefix="$PREFIX"   --pkg-config-flags="--static"   --extra-cflags="-fPIC -O2 -I$PREFIX/include"   --extra-ldflags="-L$PREFIX/lib"   --disable-everything   --disable-doc   --disable-avdevice   --disable-swscale   --disable-postproc   --disable-avfilter   --disable-network   --disable-programs   --disable-shared --enable-static --disable-symver   --enable-small   --enable-avformat   --enable-avcodec   --enable-avutil   --enable-swresample   --enable-decoder=aac,alac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,wavpack,ape,mpc7,mpc8,tak,tta,dsd_lsbf,dsd_msbf,wmav1,wmav2   --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak   --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis   --enable-protocol=file
 make -j"$JOBS"
 make install
 cd -
@@ -108,4 +108,5 @@ done
 
 echo "==> All dependencies installed to $PREFIX"
 ls -lh "$PREFIX/lib" | head -n 50
+find "$PREFIX" -name "libavformat*" -o -name "libtag*" | head -n 20
 echo "Done."
