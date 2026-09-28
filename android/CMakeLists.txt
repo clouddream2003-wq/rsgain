@@ -23,7 +23,7 @@ find_library(ANDROID_LIB android)
 
 foreach(l AVFORMAT_LIB AVCODEC_LIB AVUTIL_LIB SWRESAMPLE_LIB TAGLIB_LIB EBUR128_LIB FMT_LIB ZLIB_LIB)
   if(NOT ${l})
-    message(FATAL_ERROR "${l} not found under ${DEPS_PREFIX}/lib")
+    message(FATAL_ERROR "${l} not found under ${DEPS_PREFIX}/lib. DEPS_PREFIX=${DEPS_PREFIX}. Check the Build dependencies step log to confirm FFmpeg installed libavformat.a.")
   else()
     message(STATUS "${l} = ${${l}}")
   endif()
