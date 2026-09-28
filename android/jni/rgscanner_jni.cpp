@@ -8,7 +8,9 @@
 #include <cctype>
 #include <filesystem>
 #include <android/log.h>
+extern "C" {
 #include <libavutil/log.h>
+}
 
 #include "rsgain.hpp"
 #include "scan.hpp"
