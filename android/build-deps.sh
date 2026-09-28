@@ -162,6 +162,7 @@ cd "$FFSRC"
   --disable-shared \
   --enable-static \
   --enable-pic \
+  --disable-asm \
   --disable-symver \
   --enable-small \
   --enable-avformat \
