@@ -19,7 +19,7 @@ SRC_DIR="$(pwd)/deps-src"
 mkdir -p "$DEPS_DIR" "$SRC_DIR"
 cd "$SRC_DIR"
 
-if [! -d zlib-1.3.1 ]; then
+if [ ! -d zlib-1.3.1 ]; then
   curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
   tar xzf zlib.tar.gz
 fi
@@ -29,7 +29,7 @@ cmake -S zlib-1.3.1 -B zlib-build -G Ninja \
 cmake --build zlib-build
 cmake --install zlib-build
 
-if [! -d libebur128 ]; then
+if [ ! -d libebur128 ]; then
   git clone --depth 1 https://github.com/jiixyj/libebur128.git
 fi
 cmake -S libebur128 -B ebur128-build -G Ninja \
@@ -38,7 +38,7 @@ cmake -S libebur128 -B ebur128-build -G Ninja \
 cmake --build ebur128-build
 cmake --install ebur128-build
 
-if [! -d fmt-11.1.4 ]; then
+if [ ! -d fmt-11.1.4 ]; then
   curl -L -o fmt.tar.gz https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz
   tar xzf fmt.tar.gz
 fi
@@ -49,7 +49,7 @@ cmake -S fmt-11.1.4 -B fmt-build -G Ninja \
 cmake --build fmt-build
 cmake --install fmt-build
 
-if [! -d taglib-2.0.2 ]; then
+if [ ! -d taglib-2.0.2 ]; then
   curl -L -o taglib.tar.gz https://github.com/taglib/taglib/releases/download/v2.0.2/taglib-2.0.2.tar.gz
   tar xzf taglib.tar.gz
 fi
@@ -60,7 +60,7 @@ cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
 cmake --build taglib-build
 cmake --install taglib-build
 
-if [! -d ffmpeg-7.1 ]; then
+if [ ! -d ffmpeg-7.1 ]; then
   curl -L -o ffmpeg.tar.gz https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz
   tar xzf ffmpeg.tar.gz
 fi
