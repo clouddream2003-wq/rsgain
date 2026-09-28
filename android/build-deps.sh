@@ -1,13 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Build native dependencies for libreplaygain_scanner (Android arm64-v8a)
-# Installs static libs into $PREFIX/lib and headers into $PREFIX/include
-#
-# Fix for: "gzip: stdin: not in gzip format / tar: Child returned status 1"
-# Root cause was curl without -fSL piping an HTML error page (a few hundred bytes)
-# directly into tar. This script downloads to a file first, fails on HTTP errors,
-# verifies the archive, then extracts.
+# Build native dependencies for libreplaygain_scanner (Android arm64-v8a).
+# Installs static libraries into $PREFIX/lib and headers into $PREFIX/include.
 
 ABI="arm64-v8a"
 API="29"
@@ -26,7 +21,6 @@ FFMPEG_VERSION="7.0.2"
 ZLIB_URL="https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz"
 FMT_URL="https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.tar.gz"
 EBUR128_URL="https://github.com/jiixyj/libebur128/archive/refs/tags/v${EBUR128_VERSION}.tar.gz"
-TAGLIB_URL="https://github.com/taglib/taglib/archive/refs/tags/v${TAGLIB_VERSION}.tar.gz"
 FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
 
 TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
@@ -50,10 +44,12 @@ fetch_and_extract() {
   local url="$1"
   local dest_name="$2"
   local archive="$WORKDIR/$(basename "$url")"
+
   echo "==> Downloading $dest_name"
   echo "    $url"
   rm -f "$archive"
   curl -fSL --retry 3 --connect-timeout 30 -o "$archive" "$url"
+
   local size
   size=$(wc -c < "$archive")
   echo "    downloaded $size bytes"
@@ -62,20 +58,22 @@ fetch_and_extract() {
     head -c 2000 "$archive" || true
     exit 1
   fi
+
   if ! tar -tf "$archive" >/dev/null 2>&1; then
     echo "ERROR: file is not a valid tar archive: $archive"
     head -c 2000 "$archive" || true
     exit 1
   fi
+
   echo "    extracting..."
   tar -xf "$archive" -C "$WORKDIR/src"
 }
 
 cmake_build() {
   local srcdir="$1"
-  local extra_args="${2:-}"
+  shift
   echo "==> CMake building $srcdir"
-  # shellcheck disable=SC2086
+
   cmake -S "$srcdir" -B "$srcdir/build" -G Ninja \
     -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
     -DANDROID_ABI="$ABI" \
@@ -83,31 +81,40 @@ cmake_build() {
     -DCMAKE_ANDROID_STL_TYPE=c++_static \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    $extra_args
-  cmake --build "$srcdir/build" -j"$JOBS"
+    -DBUILD_SHARED_LIBS=OFF \
+    "$@"
+
+  cmake --build "$srcdir/build" --parallel "$JOBS"
   cmake --install "$srcdir/build"
 }
 
 fetch_and_extract "$ZLIB_URL" "zlib-$ZLIB_VERSION"
-cmake_build "$WORKDIR/src/zlib-$ZLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF"
+cmake_build "$WORKDIR/src/zlib-$ZLIB_VERSION"
 
 fetch_and_extract "$FMT_URL" "fmt-$FMT_VERSION"
-cmake_build "$WORKDIR/src/fmt-$FMT_VERSION" "-DBUILD_SHARED_LIBS=OFF -DFMT_DOC=OFF -DFMT_TEST=OFF"
+cmake_build "$WORKDIR/src/fmt-$FMT_VERSION" \
+  -DFMT_DOC=OFF -DFMT_TEST=OFF -DFMT_INSTALL=ON
 
 fetch_and_extract "$EBUR128_URL" "libebur128-$EBUR128_VERSION"
-cmake_build "$WORKDIR/src/libebur128-$EBUR128_VERSION" "-DBUILD_SHARED_LIBS=OFF"
+cmake_build "$WORKDIR/src/libebur128-$EBUR128_VERSION"
 
-echo "==> Cloning taglib v${TAGLIB_VERSION} with submodules"
+echo "==> Cloning TagLib v${TAGLIB_VERSION} with submodules"
 rm -rf "$WORKDIR/src/taglib-$TAGLIB_VERSION"
-git clone --depth 1 --branch v${TAGLIB_VERSION} --recurse-submodules https://github.com/taglib/taglib.git "$WORKDIR/src/taglib-$TAGLIB_VERSION"
-# Ensure submodule is present (fixes: utfcpp not found)
+git clone --depth 1 --branch "v${TAGLIB_VERSION}" --recurse-submodules \
+  https://github.com/taglib/taglib.git "$WORKDIR/src/taglib-$TAGLIB_VERSION"
 git -C "$WORKDIR/src/taglib-$TAGLIB_VERSION" submodule update --init --recursive
-cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF"
+
+cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" \
+  -DBUILD_TESTS=OFF \
+  -DBUILD_EXAMPLES=OFF \
+  -DBUILD_BINDINGS=OFF
 
 fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
 FFSRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
+
 echo "==> Configuring FFmpeg $FFMPEG_VERSION"
 cd "$FFSRC"
+
 ./configure \
   --target-os=android \
   --arch=aarch64 \
@@ -121,9 +128,14 @@ cd "$FFSRC"
   --ranlib="$RANLIB" \
   --strip="$STRIP" \
   --prefix="$PREFIX" \
+  --libdir="$PREFIX/lib" \
+  --incdir="$PREFIX/include" \
+  --pkgconfigdir="$PREFIX/lib/pkgconfig" \
   --pkg-config-flags="--static" \
   --extra-cflags="-fPIC -O2 -I$PREFIX/include" \
   --extra-ldflags="-L$PREFIX/lib" \
+  --enable-static \
+  --disable-shared \
   --disable-everything \
   --disable-doc \
   --disable-avdevice \
@@ -142,10 +154,21 @@ cd "$FFSRC"
   --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak \
   --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis \
   --enable-protocol=file
+
 make -j"$JOBS"
 make install
-cd -
+cd "$GITHUB_WORKSPACE"
 
-echo "==> All dependencies installed to $PREFIX"
-ls -lh "$PREFIX/lib" | head -n 50
-echo "Done."
+echo "==> Verifying installed FFmpeg libraries"
+for lib in avformat avcodec avutil swresample; do
+  if [ ! -f "$PREFIX/lib/lib${lib}.a" ] && [ ! -f "$PREFIX/lib/lib${lib}.so" ]; then
+    echo "ERROR: expected $PREFIX/lib/lib${lib}.a (or .so), but it was not installed."
+    echo "Files under $PREFIX/lib:"
+    find "$PREFIX/lib" -maxdepth 3 -type f -print | sort || true
+    exit 1
+  fi
+done
+
+echo "==> Installed dependency libraries:"
+find "$PREFIX/lib" -maxdepth 3 -type f \( -name '*.a' -o -name '*.so' \) -print | sort
+echo "All dependencies installed to $PREFIX"
