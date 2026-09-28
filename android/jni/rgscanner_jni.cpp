@@ -10,8 +10,8 @@
 #include <android/log.h>
 #include <libavutil/log.h>
 
-#include "scan.hpp"
 #include "rsgain.hpp"
+#include "scan.hpp"
 #include "tag.hpp"
 #include "output.hpp"
 
