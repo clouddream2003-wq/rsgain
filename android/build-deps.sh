@@ -1,81 +1,147 @@
-#!/bin/bash
-set -e
-: "${ANDROID_NDK_HOME:?ANDROID_NDK_HOME not set}"
-NDK_DIR="$ANDROID_NDK_HOME"
-TOOLCHAIN="$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64"
-API=29
-TARGET=aarch64-linux-android
-SYSROOT="$TOOLCHAIN/sysroot"
-export CC="$TOOLCHAIN/bin/${TARGET}${API}-clang"
-export CXX="$TOOLCHAIN/bin/${TARGET}${API}-clang++"
-export AR="$TOOLCHAIN/bin/llvm-ar"
-export RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
-export STRIP="$TOOLCHAIN/bin/llvm-strip"
-export CFLAGS="-O3 -fPIC"
-export CXXFLAGS="-O3 -fPIC"
-TC="$NDK_DIR/build/cmake/android.toolchain.cmake"
-DEPS_DIR="$(pwd)/deps"
-SRC_DIR="$(pwd)/deps-src"
-mkdir -p "$DEPS_DIR" "$SRC_DIR"
-cd "$SRC_DIR"
+#!/usr/bin/env bash
+set -euo pipefail
 
-if [! -d zlib-1.3.1 ]; then
-  curl -L -o zlib.tar.gz https://zlib.net/zlib-1.3.1.tar.gz
-  tar xzf zlib.tar.gz
-fi
-cmake -S zlib-1.3.1 -B zlib-build -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF
-cmake --build zlib-build
-cmake --install zlib-build
+# Build native dependencies for libreplaygain_scanner (Android arm64-v8a)
+# Installs static libs into $PREFIX/lib and headers into $PREFIX/include
+#
+# Fix for: "gzip: stdin: not in gzip format / tar: Child returned status 1"
+# Root cause was curl without -fSL piping an HTML error page (a few hundred bytes)
+# directly into tar. This script downloads to a file first, fails on HTTP errors,
+# verifies the archive, then extracts.
 
-if [! -d libebur128 ]; then
-  git clone --depth 1 https://github.com/jiixyj/libebur128.git
-fi
-cmake -S libebur128 -B ebur128-build -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF
-cmake --build ebur128-build
-cmake --install ebur128-build
+ABI="arm64-v8a"
+API="29"
+PREFIX="${GITHUB_WORKSPACE:-$PWD}/deps"
+JOBS="$(nproc)"
+WORKDIR="/tmp/rg-deps"
 
-if [! -d fmt-11.1.4 ]; then
-  curl -L -o fmt.tar.gz https://github.com/fmtlib/fmt/archive/refs/tags/11.1.4.tar.gz
-  tar xzf fmt.tar.gz
-fi
-cmake -S fmt-11.1.4 -B fmt-build -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DBUILD_SHARED_LIBS=OFF \
-  -DFMT_DOC=OFF -DFMT_TEST=OFF
-cmake --build fmt-build
-cmake --install fmt-build
+: "${ANDROID_NDK_HOME:?ANDROID_NDK_HOME must be set (provided by nttld/setup-ndk)}"
 
-if [! -d taglib-2.0.2 ]; then
-  curl -L -o taglib.tar.gz https://github.com/taglib/taglib/releases/download/v2.0.2/taglib-2.0.2.tar.gz
-  tar xzf taglib.tar.gz
-fi
-cmake -S taglib-2.0.2 -B taglib-build -G Ninja \
-  -DCMAKE_TOOLCHAIN_FILE="$TC" -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-$API \
-  -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX="$DEPS_DIR" -DCMAKE_PREFIX_PATH="$DEPS_DIR" \
-  -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF
-cmake --build taglib-build
-cmake --install taglib-build
+ZLIB_VERSION="1.3.1"
+FMT_VERSION="10.2.1"
+EBUR128_VERSION="1.2.6"
+TAGLIB_VERSION="2.0.2"
+FFMPEG_VERSION="7.0.2"
 
-if [! -d ffmpeg-7.1 ]; then
-  curl -L -o ffmpeg.tar.gz https://ffmpeg.org/releases/ffmpeg-7.1.tar.gz
-  tar xzf ffmpeg.tar.gz
-fi
-cd ffmpeg-7.1
+ZLIB_URL="https://github.com/madler/zlib/releases/download/v${ZLIB_VERSION}/zlib-${ZLIB_VERSION}.tar.gz"
+FMT_URL="https://github.com/fmtlib/fmt/archive/refs/tags/${FMT_VERSION}.tar.gz"
+EBUR128_URL="https://github.com/jiixyj/libebur128/archive/refs/tags/v${EBUR128_VERSION}.tar.gz"
+TAGLIB_URL="https://github.com/taglib/taglib/archive/refs/tags/v${TAGLIB_VERSION}.tar.gz"
+FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-${FFMPEG_VERSION}.tar.xz"
+
+TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake"
+HOST_TAG="linux-x86_64"
+LLVM_BIN="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG/bin"
+SYSROOT="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/$HOST_TAG/sysroot"
+TRIPLE="aarch64-linux-android"
+
+export CC="$LLVM_BIN/${TRIPLE}${API}-clang"
+export CXX="$LLVM_BIN/${TRIPLE}${API}-clang++"
+export AR="$LLVM_BIN/llvm-ar"
+export RANLIB="$LLVM_BIN/llvm-ranlib"
+export STRIP="$LLVM_BIN/llvm-strip"
+export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+
+echo "PREFIX=$PREFIX"
+echo "NDK=$ANDROID_NDK_HOME"
+mkdir -p "$PREFIX" "$WORKDIR/src"
+
+fetch_and_extract() {
+  local url="$1"
+  local dest_name="$2"
+  local archive="$WORKDIR/$(basename "$url")"
+  echo "==> Downloading $dest_name"
+  echo "    $url"
+  rm -f "$archive"
+  curl -fSL --retry 3 --connect-timeout 30 -o "$archive" "$url"
+  local size
+  size=$(wc -c < "$archive")
+  echo "    downloaded $size bytes"
+  if [ "$size" -lt 10240 ]; then
+    echo "ERROR: downloaded file too small ($size bytes), likely an HTML error page:"
+    head -c 2000 "$archive" || true
+    exit 1
+  fi
+  if ! tar -tf "$archive" >/dev/null 2>&1; then
+    echo "ERROR: file is not a valid tar archive: $archive"
+    head -c 2000 "$archive" || true
+    exit 1
+  fi
+  echo "    extracting..."
+  tar -xf "$archive" -C "$WORKDIR/src"
+}
+
+cmake_build() {
+  local srcdir="$1"
+  local extra_args="${2:-}"
+  echo "==> CMake building $srcdir"
+  # shellcheck disable=SC2086
+  cmake -S "$srcdir" -B "$srcdir/build" -G Ninja \
+    -DCMAKE_TOOLCHAIN_FILE="$TOOLCHAIN_FILE" \
+    -DANDROID_ABI="$ABI" \
+    -DANDROID_PLATFORM="android-$API" \
+    -DCMAKE_ANDROID_STL_TYPE=c++_static \
+    -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+    -DCMAKE_BUILD_TYPE=Release \
+    $extra_args
+  cmake --build "$srcdir/build" -j"$JOBS"
+  cmake --install "$srcdir/build"
+}
+
+fetch_and_extract "$ZLIB_URL" "zlib-$ZLIB_VERSION"
+cmake_build "$WORKDIR/src/zlib-$ZLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF"
+
+fetch_and_extract "$FMT_URL" "fmt-$FMT_VERSION"
+cmake_build "$WORKDIR/src/fmt-$FMT_VERSION" "-DBUILD_SHARED_LIBS=OFF -DFMT_DOC=OFF -DFMT_TEST=OFF"
+
+fetch_and_extract "$EBUR128_URL" "libebur128-$EBUR128_VERSION"
+cmake_build "$WORKDIR/src/libebur128-$EBUR128_VERSION" "-DBUILD_SHARED_LIBS=OFF"
+
+fetch_and_extract "$TAGLIB_URL" "taglib-$TAGLIB_VERSION"
+cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF"
+
+fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
+FFSRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
+echo "==> Configuring FFmpeg $FFMPEG_VERSION"
+cd "$FFSRC"
 ./configure \
-  --prefix="$DEPS_DIR" \
-  --target-os=android --arch=aarch64 --cpu=armv8-a \
-  --cc="$CC" --cxx="$CXX" --ar="$AR" --ranlib="$RANLIB" --strip="$STRIP" \
+  --target-os=android \
+  --arch=aarch64 \
+  --cpu=armv8-a \
+  --enable-cross-compile \
+  --cross-prefix="$LLVM_BIN/$TRIPLE-" \
   --sysroot="$SYSROOT" \
-  --enable-cross-compile --enable-asm --enable-pic \
-  --disable-programs --disable-doc \
-  --disable-avdevice --disable-swscale --disable-postproc --disable-avfilter \
-  --disable-network --disable-encoders --disable-muxers --disable-debug \
-  --extra-cflags="-O3 -fPIC" \
-  --extra-ldflags="-Wl,-z,max-page-size=16384"
-make -j$(nproc)
+  --cc="$CC" \
+  --cxx="$CXX" \
+  --ar="$AR" \
+  --ranlib="$RANLIB" \
+  --strip="$STRIP" \
+  --prefix="$PREFIX" \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-fPIC -O2 -I$PREFIX/include" \
+  --extra-ldflags="-L$PREFIX/lib" \
+  --disable-everything \
+  --disable-doc \
+  --disable-avdevice \
+  --disable-swscale \
+  --disable-postproc \
+  --disable-avfilter \
+  --disable-network \
+  --disable-programs \
+  --disable-symver \
+  --enable-small \
+  --enable-avformat \
+  --enable-avcodec \
+  --enable-avutil \
+  --enable-swresample \
+  --enable-decoder=aac,alac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,wavpack,ape,mpc7,mpc8,tak,tta,dsd_lsbf,dsd_msbf,wmav1,wmav2 \
+  --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak \
+  --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis \
+  --enable-protocol=file
+make -j"$JOBS"
 make install
-cd..
+cd -
+
+echo "==> All dependencies installed to $PREFIX"
+ls -lh "$PREFIX/lib" | head -n 50
+echo "Done."
