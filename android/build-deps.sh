@@ -3,7 +3,6 @@ set -euo pipefail
 
 # Build native dependencies for libreplaygain_scanner (Android arm64-v8a)
 # Installs static libs into $PREFIX/lib and headers into $PREFIX/include
-# FIX: Build everything with -fPIC / --enable-pic so static archives can link into .so on arm64
 
 ABI="arm64-v8a"
 API="29"
@@ -35,16 +34,10 @@ export CXX="$LLVM_BIN/${TRIPLE}${API}-clang++"
 export AR="$LLVM_BIN/llvm-ar"
 export RANLIB="$LLVM_BIN/llvm-ranlib"
 export STRIP="$LLVM_BIN/llvm-strip"
-# FIX: ensure PIC for all C/C++ compilation (static libs -> shared .so)
-export CFLAGS="-fPIC -O2 -DANDROID"
-export CXXFLAGS="-fPIC -O2 -DANDROID"
-export LDFLAGS=""
 export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
 
 echo "PREFIX=$PREFIX"
 echo "NDK=$ANDROID_NDK_HOME"
-echo "CC=$CC"
-echo "CFLAGS=$CFLAGS"
 mkdir -p "$PREFIX" "$WORKDIR/src"
 
 fetch_and_extract() {
@@ -84,9 +77,6 @@ cmake_build() {
     -DCMAKE_ANDROID_STL_TYPE=c++_static \
     -DCMAKE_INSTALL_PREFIX="$PREFIX" \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-    -DCMAKE_C_FLAGS="-fPIC" \
-    -DCMAKE_CXX_FLAGS="-fPIC" \
     $extra_args
   cmake --build "$srcdir/build" -j"$JOBS"
   cmake --install "$srcdir/build"
@@ -105,54 +95,90 @@ echo "==> Cloning taglib v${TAGLIB_VERSION} with submodules"
 rm -rf "$WORKDIR/src/taglib-$TAGLIB_VERSION"
 git clone --depth 1 --branch v${TAGLIB_VERSION} --recurse-submodules https://github.com/taglib/taglib.git "$WORKDIR/src/taglib-$TAGLIB_VERSION"
 git -C "$WORKDIR/src/taglib-$TAGLIB_VERSION" submodule update --init --recursive
-cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF -DBUILD_SHARED_LIBS=OFF"
+cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF"
 
-# rsgain's rsgain.hpp includes <taglib/taglib_config.h> - ensure it is findable
-# (kept from original script functionality)
-if [ -f "$PREFIX/include/taglib/taglib_config.h" ]; then
-  echo "taglib_config.h found"
+# rsgain's rsgain.hpp includes <taglib/taglib_config.h> (only to test
+# TAGLIB_WITH_MATROSKA). TagLib 2.x no longer generates this header at all,
+# so install it from the build tree if present, otherwise generate a
+# compatibility header. TAGLIB_WITH_MATROSKA stays undefined: stock TagLib
+# (1.x and 2.x) has no Matroska support, so HAS_MATROSKA remains undefined
+# exactly as with a stock TagLib 1.x build.
+if [ ! -f "$PREFIX/include/taglib/taglib_config.h" ]; then
+  _cfg=$(find "$WORKDIR/src/taglib-$TAGLIB_VERSION" "$PREFIX/include" -name "taglib_config.h" 2>/dev/null | head -n 1 || true)
+  if [ -n "${_cfg:-}" ]; then
+    echo "Found taglib_config.h at $_cfg, installing to $PREFIX/include/taglib/"
+    mkdir -p "$PREFIX/include/taglib"
+    cp "$_cfg" "$PREFIX/include/taglib/taglib_config.h"
+  else
+    echo "TagLib 2.x does not provide taglib_config.h; generating compatibility header"
+    mkdir -p "$PREFIX/include/taglib"
+    cat > "$PREFIX/include/taglib/taglib_config.h" <<'EOF'
+#ifndef TAGLIB_TAGLIB_CONFIG_H
+#define TAGLIB_TAGLIB_CONFIG_H
+
+/* Compatibility header: TagLib 2.x no longer generates taglib_config.h
+ * (all supported formats are unconditionally enabled). TAGLIB_WITH_MATROSKA
+ * is intentionally left undefined because stock TagLib has no Matroska
+ * support, matching the behavior of stock TagLib 1.x builds. */
+
+#endif /* TAGLIB_TAGLIB_CONFIG_H */
+EOF
+  fi
 fi
 
-echo "==> Building FFmpeg $FFMPEG_VERSION (static, PIC enabled)"
 fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
-FFMPEG_SRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
-cd "$FFMPEG_SRC"
-
-# Clean any previous build state
-make distclean || true
-
+FFSRC="$WORKDIR/src/ffmpeg-$FFMPEG_VERSION"
+echo "==> Configuring FFmpeg $FFMPEG_VERSION"
+cd "$FFSRC"
 ./configure \
   --target-os=android \
   --arch=aarch64 \
   --cpu=armv8-a \
+  --enable-cross-compile \
+  --cross-prefix="$LLVM_BIN/$TRIPLE-" \
+  --sysroot="$SYSROOT" \
   --cc="$CC" \
   --cxx="$CXX" \
   --ar="$AR" \
   --ranlib="$RANLIB" \
   --strip="$STRIP" \
-  --nm="$LLVM_BIN/llvm-nm" \
-  --sysroot="$SYSROOT" \
-  --cross-prefix="$LLVM_BIN/llvm-" \
-  --disable-shared \
-  --enable-static \
-  --enable-pic \
-  --disable-programs \
+  --prefix="$PREFIX" \
+  --pkg-config-flags="--static" \
+  --extra-cflags="-fPIC -O2 -I$PREFIX/include" \
+  --extra-ldflags="-L$PREFIX/lib" \
+  --disable-everything \
   --disable-doc \
   --disable-avdevice \
+  --disable-swscale \
   --disable-postproc \
+  --disable-avfilter \
   --disable-network \
-  --disable-iconv \
-  --extra-cflags="-fPIC -O2 -DANDROID" \
-  --extra-cxxflags="-fPIC -O2 -DANDROID" \
-  --extra-ldflags="" \
-  --prefix="$PREFIX"
-
+  --disable-programs \
+  --disable-shared \
+  --enable-static \
+  --disable-symver \
+  --enable-small \
+  --enable-avformat \
+  --enable-avcodec \
+  --enable-avutil \
+  --enable-swresample \
+  --enable-decoder=aac,alac,flac,mp3,opus,vorbis,pcm_s16le,pcm_s24le,pcm_s32le,pcm_f32le,pcm_f64le,pcm_u8,wavpack,ape,mpc7,mpc8,tak,tta,dsd_lsbf,dsd_msbf,wmav1,wmav2 \
+  --enable-demuxer=aac,flac,mov,mp4,m4a,3gp,mp3,ogg,opus,wav,aiff,ape,wv,asf,dsf,mpc,tta,tak \
+  --enable-parser=aac,aac_latm,flac,mpegaudio,opus,vorbis \
+  --enable-protocol=file
 make -j"$JOBS"
 make install
 cd -
 
-echo "==> All deps installed to $PREFIX"
-echo "==> Verifying PIC in static libs:"
-# quick check: none of the .a should contain non-PIC relocs that lld complains about
-# we just list that they exist
-ls -lh "$PREFIX/lib/"*.a || true
+for _a in avformat avcodec avutil swresample; do
+  if ! ls "$PREFIX/lib/lib${_a}.a" >/dev/null 2>&1 && ! ls "$PREFIX/lib64/lib${_a}.a" >/dev/null 2>&1; then
+    echo "ERROR: lib${_a}.a not found under $PREFIX/lib after FFmpeg build"
+    ls -lh "$PREFIX/lib" || true
+    exit 1
+  fi
+done
+
+echo "==> All dependencies installed to $PREFIX"
+ls -lh "$PREFIX/lib" | head -n 50 || true
+find "$PREFIX" -name "libavformat*" -o -name "libtag*" | head -n 20 || true
+echo "Done."
