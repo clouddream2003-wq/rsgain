@@ -97,7 +97,11 @@ cmake_build "$WORKDIR/src/fmt-$FMT_VERSION" "-DBUILD_SHARED_LIBS=OFF -DFMT_DOC=O
 fetch_and_extract "$EBUR128_URL" "libebur128-$EBUR128_VERSION"
 cmake_build "$WORKDIR/src/libebur128-$EBUR128_VERSION" "-DBUILD_SHARED_LIBS=OFF"
 
-fetch_and_extract "$TAGLIB_URL" "taglib-$TAGLIB_VERSION"
+echo "==> Cloning taglib v${TAGLIB_VERSION} with submodules"
+rm -rf "$WORKDIR/src/taglib-$TAGLIB_VERSION"
+git clone --depth 1 --branch v${TAGLIB_VERSION} --recurse-submodules https://github.com/taglib/taglib.git "$WORKDIR/src/taglib-$TAGLIB_VERSION"
+# Ensure submodule is present (fixes: utfcpp not found)
+git -C "$WORKDIR/src/taglib-$TAGLIB_VERSION" submodule update --init --recursive
 cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF"
 
 fetch_and_extract "$FFMPEG_URL" "ffmpeg-$FFMPEG_VERSION"
