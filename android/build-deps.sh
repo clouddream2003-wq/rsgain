@@ -18,6 +18,9 @@ DEPS_DIR="$(pwd)/deps"
 SRC_DIR="$(pwd)/deps-src"
 mkdir -p "$DEPS_DIR" "$SRC_DIR"
 cd "$SRC_DIR"
+echo "PWD: $(pwd)"
+echo "DEPS_DIR: $DEPS_DIR"
+echo "GITHUB_WORKSPACE: ${GITHUB_WORKSPACE:-<unset>}"
 
 fetch_tar() {
   rm -f "$2"
