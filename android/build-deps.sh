@@ -97,19 +97,32 @@ git clone --depth 1 --branch v${TAGLIB_VERSION} --recurse-submodules https://git
 git -C "$WORKDIR/src/taglib-$TAGLIB_VERSION" submodule update --init --recursive
 cmake_build "$WORKDIR/src/taglib-$TAGLIB_VERSION" "-DBUILD_SHARED_LIBS=OFF -DBUILD_TESTS=OFF -DBUILD_EXAMPLES=OFF -DBUILD_BINDINGS=OFF"
 
-# TagLib generates taglib_config.h at build time; make sure it ends up where
-# rsgain expects it ($PREFIX/include/taglib/taglib_config.h)
+# rsgain's rsgain.hpp includes <taglib/taglib_config.h> (only to test
+# TAGLIB_WITH_MATROSKA). TagLib 2.x no longer generates this header at all,
+# so install it from the build tree if present, otherwise generate a
+# compatibility header. TAGLIB_WITH_MATROSKA stays undefined: stock TagLib
+# (1.x and 2.x) has no Matroska support, so HAS_MATROSKA remains undefined
+# exactly as with a stock TagLib 1.x build.
 if [ ! -f "$PREFIX/include/taglib/taglib_config.h" ]; then
-  echo "WARNING: $PREFIX/include/taglib/taglib_config.h missing, searching for it..."
   _cfg=$(find "$WORKDIR/src/taglib-$TAGLIB_VERSION" "$PREFIX/include" -name "taglib_config.h" 2>/dev/null | head -n 1 || true)
   if [ -n "${_cfg:-}" ]; then
     echo "Found taglib_config.h at $_cfg, installing to $PREFIX/include/taglib/"
     mkdir -p "$PREFIX/include/taglib"
     cp "$_cfg" "$PREFIX/include/taglib/taglib_config.h"
   else
-    echo "ERROR: taglib_config.h not found anywhere after TagLib build"
-    find "$PREFIX/include" -maxdepth 2 2>/dev/null | head -n 30 || true
-    exit 1
+    echo "TagLib 2.x does not provide taglib_config.h; generating compatibility header"
+    mkdir -p "$PREFIX/include/taglib"
+    cat > "$PREFIX/include/taglib/taglib_config.h" <<'EOF'
+#ifndef TAGLIB_TAGLIB_CONFIG_H
+#define TAGLIB_TAGLIB_CONFIG_H
+
+/* Compatibility header: TagLib 2.x no longer generates taglib_config.h
+ * (all supported formats are unconditionally enabled). TAGLIB_WITH_MATROSKA
+ * is intentionally left undefined because stock TagLib has no Matroska
+ * support, matching the behavior of stock TagLib 1.x builds. */
+
+#endif /* TAGLIB_TAGLIB_CONFIG_H */
+EOF
   fi
 fi
 
