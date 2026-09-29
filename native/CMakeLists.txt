@@ -1,17 +1,33 @@
 cmake_minimum_required(VERSION 3.22)
 project(replaygain_scanner)
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(BUILD_SHARED_LIBS OFF)
-include(FetchContent)
-FetchContent_Declare(
-  ebur128
-  GIT_REPOSITORY https://github.com/jiixyj/libebur128.git
-  GIT_TAG master
+
+add_library(replaygain_scanner SHARED
+  src/replaygain_jni.cpp
+  src/ebur128.c
 )
-FetchContent_MakeAvailable(ebur128)
-add_library(replaygain_scanner SHARED jni_bridge.cpp)
-find_library(log-lib log)
-target_include_directories(replaygain_scanner PRIVATE ${ebur128_SOURCE_DIR}/ebur128)
-target_link_libraries(replaygain_scanner ebur128 ${log-lib})
-set_target_properties(replaygain_scanner PROPERTIES OUTPUT_NAME replaygain_scanner)
+
+target_include_directories(replaygain_scanner PRIVATE
+  src
+  include
+)
+
+target_link_libraries(replaygain_scanner
+  log
+  mediandk
+  android
+)
+
+target_compile_options(replaygain_scanner PRIVATE
+  -O3 -ffast-math -funroll-loops
+  -march=armv8-a+simd -ftree-vectorize
+)
+
+# 16KB page size required for Play Store Android 15+
+target_link_options(replaygain_scanner PRIVATE
+  "-Wl,-z,max-page-size=16384"
+)
+
+set_target_properties(replaygain_scanner PROPERTIES
+  CXX_STANDARD 17
+  OUTPUT_NAME "replaygain_scanner"
+)
