@@ -2,24 +2,25 @@ name: build-arm64
 on: [push, workflow_dispatch]
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
-      - name: Setup NDK
-        uses: nttld/setup-ndk@v1
+          submodules: true
+      - uses: nttld/setup-ndk@v1
         with:
           ndk-version: r26d
-      - name: Install host tools
+      - name: Configure
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ninja-build pkg-config curl unzip
-      - name: Build arm64.so
-        run: |
-          cmake -S native -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-29 -DCMAKE_BUILD_TYPE=Release
-          cmake --build build -j$(nproc)
-      - uses: actions/upload-artifact@v4
+          cmake -S native -B build \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-29 \
+            -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build -j$(nproc)
+      - name: Upload
+        uses: actions/upload-artifact@v4
         with:
           name: libreplaygain_scanner-arm64
           path: build/libreplaygain_scanner.so
